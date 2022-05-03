@@ -3,16 +3,25 @@ from re import S
 import os
 import argparse
 import collections
-import torch
 import numpy as np
 import pandas as pd
 import logging
+import hashlib
 
 from pathlib import Path
 from datetime import datetime
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+from sympy import N
 from utils import read_json, rearrange_train_test_split
+
+import torch
+import torch.optim as optim
+from torch.utils.data import DataLoader
+
+import data_loader
+import graph
+import model
 
 SEED = 123
 torch.maual_seed(SEED)
@@ -53,6 +62,73 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json')):
     train_df, test_df = train_test_split(
         origin_df, test_size=config['preprocessing']['validation_split'], random_state=SEED)
     train_df, test_df = rearrange_train_test_split(train_df, test_df)
+
+    train_dataset = data_loader.CustomDataset(train_df)
+    test_dataset = data_loader.CustomDataset(test_df)
+    train_dataloader = DataLoader(
+        train_dataset, batch_size=config['data_loader']['batch_size'], shuffle=config['data_loader']['shuffle'])
+    test_dataloader = DataLoader(
+        test_dataset, batch_size=config['data_loader']['batch_size'], shuffle=config['data_loader']['shuffle'])
+
+    # make graph
+    data_generator = graph.Graph()
+    plain_adj, norm_adj, mean_adj = data_generator.get.adj_mat()
+    # make metric score
+
+    # make hyper parameter dict
+    hyper_parameter_dict = {}
+
+    for lr in config['optimizer']['lr']:
+        for regs in config['optimizer']['regs']:
+            for gamma in config['lr_scheduler']['gamma']:
+                for node_dropout in config['model']['node_drop']:
+                    for embed_size in config['model']['embed_size']:
+
+                        hyper_parameter_dict['node_drop'] = node_dropout
+                        hyper_parameter_dict['gamma'] = gamma
+                        hyper_parameter_dict['regs'] = regs
+                        hyper_parameter_dict['lr'] = lr
+                        hyper_parameter_dict['embed_size'] = embed_size
+
+                        hash_key = hashlib.sha1(
+                            str(hyper_parameter_dict).encode()).hexdigest()[:8]
+
+                        model = model.NGCF(data_generator.n_users,
+                                           data_generator.n_items,
+                                           norm_adj,
+                                           hyper_parameter_dict,
+                                           config)
+
+                        optimizer = optim.Adam(
+                            model.parameters(), lr=hyper_parameter_dict['lr'])
+
+                        for epoch in range(config['train']['epoch']):
+                            train_loss = 0
+
+                            model.train()
+                            for users, items, labels in train_dataloader:
+                                users_embedding, items_embedding = model(
+                                    users, items)
+                                batch_loss = model.loss(
+                                    users_embedding, items_embedding, labels)
+                                optimizer.zero_grad()
+                                batch_loss.backward()
+                                optimizer.step()
+                                train_loss += batch_loss.item() / len(train_dataloader)
+
+                            test_loss = 0
+
+                            with torch.no_grad():
+                                model.eval()
+                                for users, items, labels in test_dataloader:
+                                    users_embedding, items_embedding = model(
+                                        users, items)
+
+                                    batch_loss = model.loss(
+                                        users_embedding, items_embedding, labels)
+                                    test_loss += batch_loss.item() / len(test_dataloader)
+
+                                # 여기에 logging하는 작업이 필요
 
     '''
     그런데 여기 아래의 과정에서 hyper parameter 관련 for문을 생성해야함

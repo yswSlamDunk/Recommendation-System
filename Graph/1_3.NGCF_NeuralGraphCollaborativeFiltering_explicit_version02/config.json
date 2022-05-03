@@ -18,8 +18,7 @@
     },
 
     "preprocessing" : {
-        "validation_split" : 0.1,
-        "adj_type" : ["plain", "norm", "mean"]
+        "validation_split" : 0.1
     },
 
     "optimizer" : {
@@ -38,7 +37,6 @@
     },
 
     "model" : {
-        "node_drop_flag" : ["Activate Node Dropout", "Disable Node Dropout"],
         "node_drop" : [0.1, 0.2, 0.3],
         "mess_dropout" : [0.1, 0.1, 0.1],
         "embed_size" : [10, 20, 30, 40],
