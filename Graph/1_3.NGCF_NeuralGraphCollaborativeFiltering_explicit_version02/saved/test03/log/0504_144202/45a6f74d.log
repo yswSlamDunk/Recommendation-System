@@ -1,0 +1,5 @@
+2022-05-04 14:57:50,829  - INFO - epoch : 0, train_loss : 1.4078, test_loss : 1.4105
+2022-05-04 14:59:17,229  - INFO - epoch : 1, train_loss : 1.409, test_loss : 1.4144
+2022-05-04 15:00:47,549  - INFO - epoch : 2, train_loss : 1.4113, test_loss : 1.4136
+2022-05-04 15:02:20,273  - INFO - epoch : 3, train_loss : 1.4104, test_loss : 1.4102
+2022-05-04 15:03:46,491  - INFO - epoch : 4, train_loss : 1.4113, test_loss : 1.4233

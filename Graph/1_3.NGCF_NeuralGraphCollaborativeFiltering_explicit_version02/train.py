@@ -7,13 +7,13 @@ import numpy as np
 import pandas as pd
 import logging
 import hashlib
+import logging
 
 from pathlib import Path
 from datetime import datetime
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sympy import N
-from utils import read_json, rearrange_train_test_split
 
 import torch
 import torch.optim as optim
@@ -21,20 +21,24 @@ from torch.utils.data import DataLoader
 
 import data_loader
 import graph
-import model
+import logger
+from model import model_NGCF
+from utils import read_json, rearrange_train_test_split, write_json, prepare_device, write_model
 
 SEED = 123
-torch.maual_seed(SEED)
+torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
 
-def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json')):
+def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger_path=os.path.join(os.getcwd(), 'logger/logger_config.json')):
     config = read_json(config_path)
 
+    device, list_ids = prepare_device(config['cuda']['n_gpu'])
+
     base_dir = Path(config['train']['save_dir'])
-    base_id = datetime.now().strftime(r'%m%d_%H%M%S')
+    base_id = datetime.now().strftime(r'%y%m%d_%H%M%S')
 
     save_dir = base_dir / user_name / 'models' / base_id
     log_dir = base_dir / user_name / 'log' / base_id
@@ -42,10 +46,6 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json')):
     # make directory for saving check
     save_dir.mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)
-
-    # init_logging and setLevel
-    logger = logging.getLogger(user_name)
-    logger.setLevel(config['train']['logging_berbosity'])
 
     # make train_valid data & preprocessing data
     file_name = config['data']['file_name']
@@ -71,36 +71,63 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json')):
         test_dataset, batch_size=config['data_loader']['batch_size'], shuffle=config['data_loader']['shuffle'])
 
     # make graph
-    data_generator = graph.Graph()
-    plain_adj, norm_adj, mean_adj = data_generator.get.adj_mat()
+    data_generator = graph.Graph(train_df, config)
+    plain_adj, norm_adj, mean_adj = data_generator.get_adj_mat()
+
     # make metric score
+    total_best_score = np.inf
 
     # make hyper parameter dict
     hyper_parameter_dict = {}
-
-    for lr in config['optimizer']['lr']:
+    for learning_rate in config['optimizer']['lr']:
         for regs in config['optimizer']['regs']:
-            for gamma in config['lr_scheduler']['gamma']:
+            for scheduler_gamma in config['lr_scheduler']['gamma']:
                 for node_dropout in config['model']['node_drop']:
                     for embed_size in config['model']['embed_size']:
 
-                        hyper_parameter_dict['node_drop'] = node_dropout
-                        hyper_parameter_dict['gamma'] = gamma
-                        hyper_parameter_dict['regs'] = regs
-                        hyper_parameter_dict['lr'] = lr
-                        hyper_parameter_dict['embed_size'] = embed_size
+                        patience = config['train']['early_stop']
+
+                        best_score = np.inf
+
+                        hyper_parameter_dict['model'] = {}
+                        hyper_parameter_dict['optimizer'] = {}
+                        hyper_parameter_dict['lr_scheduler'] = {}
+
+                        hyper_parameter_dict['model']['node_drop'] = node_dropout
+                        hyper_parameter_dict['model']['embed_size'] = embed_size
+
+                        hyper_parameter_dict['lr_scheduler']['gamma'] = scheduler_gamma
+                        hyper_parameter_dict['optimizer']['regs'] = regs
+                        hyper_parameter_dict['optimizer']['lr'] = learning_rate
 
                         hash_key = hashlib.sha1(
                             str(hyper_parameter_dict).encode()).hexdigest()[:8]
 
-                        model = model.NGCF(data_generator.n_users,
-                                           data_generator.n_items,
-                                           norm_adj,
-                                           hyper_parameter_dict,
-                                           config)
+                        logger.setup_logging(log_dir, hash_key)
+
+                        logger_instance = logging.getLogger(user_name)
+                        logger_instance.setLevel(
+                            config['train']['logging_verbosity'])
+
+                        model = model_NGCF.NGCF(data_generator.n_users,
+                                                data_generator.n_items,
+                                                norm_adj,
+                                                hyper_parameter_dict,
+                                                config,
+                                                user_le,
+                                                item_le,
+                                                train_df,
+                                                device).to(device)
+
+                        # if (len(list_ids) > 1) & (device != "cpu"):
+                        if (len(list_ids) > 1):
+                            model = torch.nn.DataParallel(
+                                model, device_ids=config['cuda']['device_ids'])
 
                         optimizer = optim.Adam(
-                            model.parameters(), lr=hyper_parameter_dict['lr'])
+                            model.parameters(), lr=learning_rate, weight_decay=regs)
+                        scheduler = optim.lr_scheduler.StepLR(
+                            optimizer, step_size=config['lr_scheduler']['step_size'], gamma=scheduler_gamma)
 
                         for epoch in range(config['train']['epoch']):
                             train_loss = 0
@@ -117,6 +144,7 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json')):
                                 train_loss += batch_loss.item() / len(train_dataloader)
 
                             test_loss = 0
+                            scheduler.step()
 
                             with torch.no_grad():
                                 model.eval()
@@ -128,19 +156,27 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json')):
                                         users_embedding, items_embedding, labels)
                                     test_loss += batch_loss.item() / len(test_dataloader)
 
-                                # 여기에 logging하는 작업이 필요
+                            logger_instance.info('epoch : {}, train_loss : {}, test_loss : {}'.format(
+                                epoch, round(train_loss, 4), round(test_loss, 4)))
 
-    '''
-    그런데 여기 아래의 과정에서 hyper parameter 관련 for문을 생성해야함
-    그리고 logging도 신경써야함
-    평가 metric의 성능도 확인해야함
-    
-    1. dataloader를 만들어야 함
-    2. model을 생성하고 logging 해야함
-    3. model의 gpu 관련 병렬처리를 해야함
-    4. loss를 선언해야함
-    5. metrics를 만들어야함
-    6. optimzier를 선언해야함
-    7. lr_scheduler를 선언해야함
-    8. ...
-    '''
+                            if test_loss < best_score:
+                                best_score = test_loss
+                                patience = config['train']['early_stop']
+
+                            else:
+                                patience -= 1
+                                if patience == 0:
+                                    break
+
+                        if best_score < total_best_score:
+                            total_best_score = best_score
+
+                            save_config = config.copy()
+                            save_config.update(hyper_parameter_dict)
+
+                            write_json(save_config, save_dir / 'model.json')
+                            write_model(model, save_dir / 'model.pickle')
+
+
+if __name__ == '__main__':
+    main('test03')

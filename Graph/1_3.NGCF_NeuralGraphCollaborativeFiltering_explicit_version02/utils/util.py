@@ -1,9 +1,17 @@
 import json
 import torch
 import pandas as pd
+import pickle
+
 from pathlib import Path
 from itertools import repeat
 from collections import OrderedDict
+
+
+def write_model(model, fname='model.pickle'):
+    # 지금 여기에 모델 저장하는 부분 작성 필요.
+    with fname.open('wb') as handle:
+        pickle.dump(model, handle)
 
 
 def ensure_dir(dirname):
@@ -18,17 +26,18 @@ def read_json(fname):
         return json.load(handle, object_hook=OrderedDict)
 
 
-def write_json(content, fname):
+def write_json(content, fname='model.conf'):
     with fname.open('wt') as handle:
         json.dump(content, handle, indent=4, sort_keys=False)
 
 
-def preprare_device(n_gpu_use):
+def prepare_device(n_gpu_use):
     n_gpu = torch.cuda.device_count()
     if n_gpu_use > 0 and n_gpu == 0:
         print('Warning: There\'s no GPU available on this machine, training will be performed on CPU.')
         n_gpu_use = n_gpu
-    device = torch.device('cuda:0' if n_gpu_use > 0 else 'cpu')
+    device = torch.device("cuda:0" if n_gpu_use > 0 else "cpu")
+
     list_ids = list(range(n_gpu_use))
     return device, list_ids
 
@@ -50,29 +59,3 @@ def rearrange_train_test_split(train, test):
         test = test[~test['movie_id'].isin(test_only_item)]
 
     return train, test
-
-
-# class MetricTracker:
-#     def __init__(self, *keys, writer=None):
-#         self.writer = writer
-#         self._data = pd.DataFrame(
-#             index=keys, columns=['total', 'counts', 'average'])
-#         self.reset()
-
-#     def reset(self):
-#         for col in self._data.columns:
-#             self._data[col].values[:] = 0
-
-#     def update(self, key, value, n=1):
-#         if self.writer is not None:
-#             self.writer.add_scalar(key, value)
-#         self._data.total[key] += value * n
-#         self._data.counts[key] += n
-#         self._data.everate[key] = self._data.total[key] / \
-#             self._data.counts[key]
-
-#     def avg(self, key):
-#         return self._data.average[key]
-
-#     def result(self):
-#         return dict(self._data.average)

@@ -4,7 +4,6 @@ import scipy.sparse as sp
 
 class Graph(object):
     def __init__(self, train_df, config):
-        # test_df가 필요한지 생각할 필요 있음
         self.n_users = len(train_df[config['data']['columns'][0]].unique())
         self.n_items = len(train_df[config['data']['columns'][1]].unique())
 
@@ -27,7 +26,7 @@ class Graph(object):
         R = self.R.tolil()
 
         adj_mat[:self.n_users, self.n_users:] = R
-        adj_mat[self.n_users:, :self.n_users] = R.T_FMT
+        adj_mat[self.n_users:, :self.n_users] = R.T
         adj_mat = adj_mat.todok()
 
         def mean_adj_single(adj):
@@ -35,7 +34,7 @@ class Graph(object):
 
             d_inv = np.power(rowsum, -1).flatten()
             d_inv[np.isinf(d_inv)] = 0.
-            d_mat_inv = sp.diages(d_inv)
+            d_mat_inv = sp.diags(d_inv)
 
             norm_adj = d_mat_inv.dot(adj)
             return norm_adj.tocoo()
@@ -58,4 +57,4 @@ class Graph(object):
 
         norm_adj_mat = mean_adj_single(adj_mat + sp.eye(adj_mat.shape[0]))
         mean_adj_mat = mean_adj_single(adj_mat)
-        return adj_mat.toscr(), norm_adj_mat.tocsr(), mean_adj_mat.tocsr()
+        return adj_mat.tocsr(), norm_adj_mat.tocsr(), mean_adj_mat.tocsr()
