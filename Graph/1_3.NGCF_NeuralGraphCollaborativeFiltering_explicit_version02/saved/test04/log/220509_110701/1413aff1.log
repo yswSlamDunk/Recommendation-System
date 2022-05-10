@@ -1,0 +1,7 @@
+2022-05-09 15:03:27,737  - INFO - epoch : 0, train_loss : 1.065, test_loss : 1.0061
+2022-05-09 15:04:45,107  - INFO - epoch : 1, train_loss : 0.9561, test_loss : 0.9768
+2022-05-09 15:06:11,530  - INFO - epoch : 2, train_loss : 0.9174, test_loss : 0.9563
+2022-05-09 15:07:50,835  - INFO - epoch : 3, train_loss : 0.8838, test_loss : 0.9511
+2022-05-09 15:09:22,742  - INFO - epoch : 4, train_loss : 0.8581, test_loss : 0.9566
+2022-05-09 15:10:53,777  - INFO - epoch : 5, train_loss : 0.836, test_loss : 0.966
+2022-05-09 15:12:28,788  - INFO - epoch : 6, train_loss : 0.8203, test_loss : 0.9531

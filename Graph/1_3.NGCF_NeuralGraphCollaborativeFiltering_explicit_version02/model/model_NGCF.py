@@ -127,10 +127,9 @@ class NGCF(nn.Module):
         u_g_embedding = self.u_g_embeddings[user_tr, :]
         total = torch.sum(u_g_embedding * self.i_g_embeddings, axis=1)
 
-        before_trans = np.arange(self.n_item)
+        trans = np.arange(self.n_item)
         argsort = total.argsort(descending=True)
-        recommendation_item = self.item_le.inverse_transform(
-            before_trans[argsort])
+        recommendation_item = self.item_le.inverse_transform(trans[argsort])
 
         list_item = self.train_df[self.train_df[self.args['data']['columns']
                                                 [0]] == user_tr][self.args['data']['columns'][1]].unique()

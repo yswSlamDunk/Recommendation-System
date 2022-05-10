@@ -1,0 +1,10 @@
+2022-05-09 14:39:51,195  - INFO - epoch : 0, train_loss : 1.0815, test_loss : 0.9794
+2022-05-09 14:41:02,928  - INFO - epoch : 1, train_loss : 0.9464, test_loss : 0.9508
+2022-05-09 14:42:26,399  - INFO - epoch : 2, train_loss : 0.9236, test_loss : 0.9472
+2022-05-09 14:43:54,804  - INFO - epoch : 3, train_loss : 0.9051, test_loss : 0.9443
+2022-05-09 14:45:23,732  - INFO - epoch : 4, train_loss : 0.892, test_loss : 0.9389
+2022-05-09 14:46:48,416  - INFO - epoch : 5, train_loss : 0.8809, test_loss : 0.9437
+2022-05-09 14:48:14,555  - INFO - epoch : 6, train_loss : 0.8738, test_loss : 0.9365
+2022-05-09 14:49:37,222  - INFO - epoch : 7, train_loss : 0.868, test_loss : 0.942
+2022-05-09 14:50:51,289  - INFO - epoch : 8, train_loss : 0.8642, test_loss : 0.9312
+2022-05-09 14:52:03,602  - INFO - epoch : 9, train_loss : 0.862, test_loss : 0.9462

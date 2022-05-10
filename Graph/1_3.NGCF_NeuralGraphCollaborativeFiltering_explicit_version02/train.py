@@ -1,8 +1,6 @@
 from re import S
 
 import os
-import argparse
-import collections
 import numpy as np
 import pandas as pd
 import logging
@@ -25,6 +23,8 @@ import logger
 from model import model_NGCF
 from utils import read_json, rearrange_train_test_split, write_json, prepare_device, write_model
 
+import time
+
 SEED = 123
 torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
@@ -33,6 +33,9 @@ np.random.seed(SEED)
 
 
 def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger_path=os.path.join(os.getcwd(), 'logger/logger_config.json')):
+
+    start = time.time()
+
     config = read_json(config_path)
 
     device, list_ids = prepare_device(config['cuda']['n_gpu'])
@@ -70,12 +73,16 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger
     test_dataloader = DataLoader(
         test_dataset, batch_size=config['data_loader']['batch_size'], shuffle=config['data_loader']['shuffle'])
 
+    print('data preprocessing : {}'.format(time.time() - start))
+
+    start = time.time()
     # make graph
     data_generator = graph.Graph(train_df, config)
     plain_adj, norm_adj, mean_adj = data_generator.get_adj_mat()
 
     # make metric score
     total_best_score = np.inf
+    print('make graph : {}'.format(time.time() - start))
 
     # make hyper parameter dict
     hyper_parameter_dict = {}
@@ -84,6 +91,8 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger
             for scheduler_gamma in config['lr_scheduler']['gamma']:
                 for node_dropout in config['model']['node_drop']:
                     for embed_size in config['model']['embed_size']:
+
+                        start = time.time()
 
                         patience = config['train']['early_stop']
 
@@ -129,10 +138,15 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger
                         scheduler = optim.lr_scheduler.StepLR(
                             optimizer, step_size=config['lr_scheduler']['step_size'], gamma=scheduler_gamma)
 
+                        print('hyper parameter, optimzer, model, multi gpu, scheduler : {}'.format(
+                            time.time() - start))
+
                         for epoch in range(config['train']['epoch']):
                             train_loss = 0
 
                             model.train()
+
+                            start_time = time.time()
                             for users, items, labels in train_dataloader:
                                 users_embedding, items_embedding = model(
                                     users, items)
@@ -145,6 +159,10 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger
 
                             test_loss = 0
                             scheduler.step()
+
+                            print('train : {}'.format(
+                                time.time() - start_time))
+                            start_time = time.time()
 
                             with torch.no_grad():
                                 model.eval()
@@ -160,23 +178,33 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger
                                 epoch, round(train_loss, 4), round(test_loss, 4)))
 
                             if test_loss < best_score:
+                                print('test_loss : {}, best_score : {}'.format(
+                                    test_loss, best_score))
                                 best_score = test_loss
                                 patience = config['train']['early_stop']
+                                print('patience : {}'.format(patience))
 
                             else:
                                 patience -= 1
+                                print('patience : {}'.format(patience))
                                 if patience == 0:
                                     break
+                            print('test : {}\n'.format(
+                                time.time() - start_time))
 
-                        if best_score < total_best_score:
-                            total_best_score = best_score
+                            start_time = time.time()
+                            if best_score < total_best_score:
+                                total_best_score = best_score
 
-                            save_config = config.copy()
-                            save_config.update(hyper_parameter_dict)
+                                save_config = config.copy()
+                                save_config.update(hyper_parameter_dict)
 
-                            write_json(save_config, save_dir / 'model.json')
-                            write_model(model, save_dir / 'model.pickle')
+                                write_json(
+                                    save_config, save_dir / 'model.json')
+                                write_model(model, save_dir / 'model.pickle')
+                            print('save_json, model for best_score_model : {}\n'.format(
+                                time.time() - start_time))
 
 
 if __name__ == '__main__':
-    main('test03')
+    main('test04')
