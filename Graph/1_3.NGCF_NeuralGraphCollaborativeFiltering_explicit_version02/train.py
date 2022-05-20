@@ -1,17 +1,14 @@
-from re import S
-
 import os
 import numpy as np
 import pandas as pd
 import logging
 import hashlib
-import logging
+import argparse
 
 from pathlib import Path
 from datetime import datetime
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sympy import N
 
 import torch
 import torch.optim as optim
@@ -21,7 +18,7 @@ import data_loader
 import graph
 import logger
 from model import model_NGCF
-from utils import read_json, rearrange_train_test_split, write_json, prepare_device, write_model
+from utils import *
 
 import time
 
@@ -32,13 +29,10 @@ torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
 
-def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger_path=os.path.join(os.getcwd(), 'logger/logger_config.json')):
-
-    start = time.time()
-
+def main(user_name, make_graph, config_path=os.path.join(os.getcwd(), 'config.json'), logger_path=os.path.join(os.getcwd(), 'logger/logger_config.json')):
     config = read_json(config_path)
 
-    device, list_ids = prepare_device(config['cuda']['n_gpu'])
+    device = prepare_device()
 
     base_dir = Path(config['train']['save_dir'])
     base_id = datetime.now().strftime(r'%y%m%d_%H%M%S')
@@ -64,25 +58,26 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger
 
     train_df, test_df = train_test_split(
         origin_df, test_size=config['preprocessing']['validation_split'], random_state=SEED)
-    train_df, test_df = rearrange_train_test_split(train_df, test_df)
+    train_df, test_df = rearrange_train_test_split(train_df, test_df, config)
 
-    train_dataset = data_loader.CustomDataset(train_df)
-    test_dataset = data_loader.CustomDataset(test_df)
+    train_dataset = data_loader.CustomDataset(train_df, device)
+    test_dataset = data_loader.CustomDataset(test_df, device)
     train_dataloader = DataLoader(
         train_dataset, batch_size=config['data_loader']['batch_size'], shuffle=config['data_loader']['shuffle'])
     test_dataloader = DataLoader(
         test_dataset, batch_size=config['data_loader']['batch_size'], shuffle=config['data_loader']['shuffle'])
 
-    print('data preprocessing : {}'.format(time.time() - start))
+    # make graph or load graph
+    if (make_graph == True) or ((make_graph == False) and (~check_graph(config))):
+        data_generator = graph.Graph(train_df, config)
+        plain_adj, norm_adj, mean_adj = data_generator.get_adj_mat()
+        write_graph(config, norm_adj)
 
-    start = time.time()
-    # make graph
-    data_generator = graph.Graph(train_df, config)
-    plain_adj, norm_adj, mean_adj = data_generator.get_adj_mat()
+    else:
+        norm_adj = load_graph(config)
 
     # make metric score
     total_best_score = np.inf
-    print('make graph : {}'.format(time.time() - start))
 
     # make hyper parameter dict
     hyper_parameter_dict = {}
@@ -91,8 +86,6 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger
             for scheduler_gamma in config['lr_scheduler']['gamma']:
                 for node_dropout in config['model']['node_drop']:
                     for embed_size in config['model']['embed_size']:
-
-                        start = time.time()
 
                         patience = config['train']['early_stop']
 
@@ -118,9 +111,7 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger
                         logger_instance.setLevel(
                             config['train']['logging_verbosity'])
 
-                        model = model_NGCF.NGCF(data_generator.n_users,
-                                                data_generator.n_items,
-                                                norm_adj,
+                        model = model_NGCF.NGCF(norm_adj,
                                                 hyper_parameter_dict,
                                                 config,
                                                 user_le,
@@ -128,25 +119,16 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger
                                                 train_df,
                                                 device).to(device)
 
-                        # if (len(list_ids) > 1) & (device != "cpu"):
-                        if (len(list_ids) > 1):
-                            model = torch.nn.DataParallel(
-                                model, device_ids=config['cuda']['device_ids'])
-
                         optimizer = optim.Adam(
                             model.parameters(), lr=learning_rate, weight_decay=regs)
                         scheduler = optim.lr_scheduler.StepLR(
                             optimizer, step_size=config['lr_scheduler']['step_size'], gamma=scheduler_gamma)
-
-                        print('hyper parameter, optimzer, model, multi gpu, scheduler : {}'.format(
-                            time.time() - start))
 
                         for epoch in range(config['train']['epoch']):
                             train_loss = 0
 
                             model.train()
 
-                            start_time = time.time()
                             for users, items, labels in train_dataloader:
                                 users_embedding, items_embedding = model(
                                     users, items)
@@ -159,10 +141,6 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger
 
                             test_loss = 0
                             scheduler.step()
-
-                            print('train : {}'.format(
-                                time.time() - start_time))
-                            start_time = time.time()
 
                             with torch.no_grad():
                                 model.eval()
@@ -178,21 +156,15 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger
                                 epoch, round(train_loss, 4), round(test_loss, 4)))
 
                             if test_loss < best_score:
-                                print('test_loss : {}, best_score : {}'.format(
-                                    test_loss, best_score))
                                 best_score = test_loss
                                 patience = config['train']['early_stop']
-                                print('patience : {}'.format(patience))
 
                             else:
                                 patience -= 1
-                                print('patience : {}'.format(patience))
+
                                 if patience == 0:
                                     break
-                            print('test : {}\n'.format(
-                                time.time() - start_time))
 
-                            start_time = time.time()
                             if best_score < total_best_score:
                                 total_best_score = best_score
 
@@ -202,9 +174,13 @@ def main(user_name, config_path=os.path.join(os.getcwd(), 'config.json'), logger
                                 write_json(
                                     save_config, save_dir / 'model.json')
                                 write_model(model, save_dir / 'model.pickle')
-                            print('save_json, model for best_score_model : {}\n'.format(
-                                time.time() - start_time))
 
 
 if __name__ == '__main__':
-    main('test04')
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-u", "--user", dest="user", action="store")
+    parser.add_argument("-g", "--make graph", dest="graph",
+                        action="store", default=True)
+    args = parser.parse_args()
+
+    main(args.user, args.graph)

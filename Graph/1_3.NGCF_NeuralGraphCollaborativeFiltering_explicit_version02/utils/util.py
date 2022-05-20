@@ -1,15 +1,31 @@
+import os
 import json
 import torch
 import pandas as pd
 import pickle
 
 from pathlib import Path
-from itertools import repeat
 from collections import OrderedDict
 
 
+def check_graph(args):
+    check = os.path.isfile(os.path.join(
+        args['data']['data_dir'], args['data']['graph_name']))
+    return check
+
+
+def write_graph(args, graph):
+    with open(os.path.join(args['data']['data_dir'], args['data']['graph_name']), 'wb') as f:
+        pickle.dump(graph, f)
+
+
+def load_graph(args):
+    with open(os.path.join(args['data']['data_dir'], args['data']['grapn_name']), 'rb') as f:
+        graph = pickle.load(f)
+        return graph
+
+
 def write_model(model, fname='model.pickle'):
-    # 지금 여기에 모델 저장하는 부분 작성 필요.
     with fname.open('wb') as handle:
         pickle.dump(model, handle)
 
@@ -31,31 +47,24 @@ def write_json(content, fname='model.conf'):
         json.dump(content, handle, indent=4, sort_keys=False)
 
 
-def prepare_device(n_gpu_use):
-    n_gpu = torch.cuda.device_count()
-    if n_gpu_use > 0 and n_gpu == 0:
-        print('Warning: There\'s no GPU available on this machine, training will be performed on CPU.')
-        n_gpu_use = n_gpu
-    device = torch.device("cuda:0" if n_gpu_use > 0 else "cpu")
-
-    list_ids = list(range(n_gpu_use))
-    return device, list_ids
+def prepare_device():
+    return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def rearrange_train_test_split(train, test):
-    test_only_item = list(set(test['movie_id'].unique(
-    ).flatten()) - set(train['movie_id'].unique().flatten()))
-    test_only_user = list(set(test['user_id'].unique(
-    ).flatten()) - set(train['user_id'].unique().flatten()))
+def rearrange_train_test_split(train, test, args):
+    test_only_user = list(set(test[args['data']['columns'][0]].unique(
+    ).flatten()) - set(train[args['data']['columns'][0]].unique().flatten()))
+    test_only_item = list(set(test[args['data']['columns'][1]].unique(
+    ).flatten()) - set(train[args['data']['columns'][1]].unique().flatten()))
 
     if len(test_only_user) != 0:
-        test_only = test[test['user_id'].isin(test_only_user)]
+        test_only = test[test[args['data']['columns'][0]].isin(test_only_user)]
         train = pd.concat([train, test_only], axis=0)
-        test = test[~test['user_id'].isin(test_only_user)]
+        test = test[~test[args['data']['columns'][0]].isin(test_only_user)]
 
     if len(test_only_item) != 0:
-        test_only = test[test['movie_id'].isin(test_only_item)]
+        test_only = test[test[args['data']['columns'][1]].isin(test_only_item)]
         train = pd.concat([train, test_only], axis=0)
-        test = test[~test['movie_id'].isin(test_only_item)]
+        test = test[~test[args['data']['columns'][1]].isin(test_only_item)]
 
     return train, test

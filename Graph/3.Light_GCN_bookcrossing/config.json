@@ -1,0 +1,51 @@
+{
+    "name" : "Light_GCN_BookCrossing",
+
+    "cuda" : {
+        "device" : "cuda"
+    },
+
+    "data" : {
+        "data_dir" : "data/",
+        "file_name" : "BX-Book-Ratings.csv",
+        "columns" : ["User-ID", "ISBN", "Book-Rating"],
+        "graph_name" : "BX-Book-Ratings-Graph.pickle"
+    },
+
+    "data_loader" : {
+        "shuffle" : true,
+        "batch_size" : 1024
+    },
+
+    "preprocessing" : {
+        "validation_split" : 0.1
+    },
+
+    "optimizer" : {
+        "type" : "Adam",
+        "lr" : [1e-2, 1e-3, 1e-4],
+        "regs" : [1e-3, 1e-4]
+    },
+
+    "loss" : {
+        "metrics" : "rmse"
+    },
+
+    "lr_scheduler" : {
+        "step_size" : 10,
+        "gamma" : [1e-2, 1e-3]
+    },
+
+    "model" : {
+        "embed_size" : [10, 20, 30],
+        "num_layers" : [2, 3, 4],
+        "node_dropout" : [0.1, 0.3]
+    },
+
+    "train" : {
+        "epoch" : 10,
+        "early_stop" : 3,
+        "logging_verbosity" : 2,
+        "save_dir" : "saved/"
+    }
+}

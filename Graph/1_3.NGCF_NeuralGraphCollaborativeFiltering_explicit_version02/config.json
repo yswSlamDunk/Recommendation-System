@@ -2,19 +2,19 @@
     "name" : "NGCF_MovieLens100k_explicit", 
 
     "cuda" : {
-        "n_gpu" : 3,
         "device" : "cuda"
     },
 
     "data" : {
         "data_dir" : "data/",
         "file_name" : "ratings.csv",
-        "columns" : ["user_id", "movie_id", "rating", "timestamp"]
+        "columns" : ["user_id", "movie_id", "rating", "timestamp"],
+        "graph_name" : "ratings.pickle"
     },
 
     "data_loader" : {
         "shuffle" : true,
-        "batch_size" : 128
+        "batch_size" : 1024
     },
 
     "preprocessing" : {
@@ -46,7 +46,6 @@
     "train" : {
         "epoch" : 10,
         "early_stop" : 3,
-        "tensorboard" : true,
         "logging_verbosity" : 2,
         "save_dir" : "saved/"
     }

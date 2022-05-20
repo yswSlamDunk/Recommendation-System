@@ -6,12 +6,12 @@ import torch.nn.functional as F
 
 
 class NGCF(nn.Module):
-    def __init__(self, n_user, n_item, norm_adj, hyper_parameter_dict, args, user_le, item_le, train_df, device):
+    def __init__(self, norm_adj, hyper_parameter_dict, args, user_le, item_le, train_df, device):
         super(NGCF, self).__init__()
         self.args = args
 
-        self.n_user = n_user
-        self.n_item = n_item
+        self.n_user = len(user_le.classes_)
+        self.n_item = len(item_le.classes_)
         self.device = device
         self.train_df = train_df
         self.user_le = user_le
