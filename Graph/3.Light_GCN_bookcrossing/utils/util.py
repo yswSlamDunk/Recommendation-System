@@ -59,12 +59,12 @@ def rearrange_train_test_split(train, test, args):
 
     if len(test_only_user) != 0:
         test_only = test[test[args['data']['columns'][0]].isin(test_only_user)]
-        train = pd.concat([train, test_only], aixs=0)
+        train = pd.concat([train, test_only], axis=0)
         test = test[~test[args['data']['columns'][0]].isin(test_only_user)]
 
     if len(test_only_item) != 0:
         test_only = test[test[args['data']['columns'][1]].isin(test_only_item)]
-        train = pd.concat([train, test_only], aixs=0)
+        train = pd.concat([train, test_only], axis=0)
         test = test[~test[args['data']['columns'][1]].isin(test_only_item)]
 
     return train, test

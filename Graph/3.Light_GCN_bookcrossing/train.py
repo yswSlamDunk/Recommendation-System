@@ -68,7 +68,7 @@ def main(user_name, make_graph, config_path = os.path.join(os.getcwd(), 'config.
 
     # make graph or load graph
     if (make_graph == True) or ((make_graph == False) and (~check_graph(config))):
-        graph = getSparseGraph(train_df, args, device)
+        graph = getSparseGraph(train_df, config, device)
         write_graph(config, graph)
 
     else:

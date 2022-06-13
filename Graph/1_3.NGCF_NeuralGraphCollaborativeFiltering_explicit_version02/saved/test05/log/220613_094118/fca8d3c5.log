@@ -1,0 +1,4 @@
+2022-06-13 09:41:42,652  - INFO - epoch : 0, train_loss : 1.3876, test_loss : 1.3256
+2022-06-13 09:42:01,385  - INFO - epoch : 1, train_loss : 1.257, test_loss : 1.2468
+2022-06-13 09:42:19,967  - INFO - epoch : 2, train_loss : 1.2383, test_loss : 1.2474
+2022-06-13 09:42:38,404  - INFO - epoch : 3, train_loss : 1.2384, test_loss : 1.2478

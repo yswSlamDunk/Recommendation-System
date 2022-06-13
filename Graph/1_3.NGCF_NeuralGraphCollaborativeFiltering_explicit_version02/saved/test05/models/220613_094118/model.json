@@ -1,0 +1,44 @@
+{
+    "name": "NGCF_MovieLens100k_explicit",
+    "cuda": {
+        "device": "cuda"
+    },
+    "data": {
+        "data_dir": "data/",
+        "file_name": "ratings.csv",
+        "columns": [
+            "user_id",
+            "movie_id",
+            "rating",
+            "timestamp"
+        ],
+        "graph_name": "ratings.pickle"
+    },
+    "data_loader": {
+        "shuffle": true,
+        "batch_size": 1024
+    },
+    "preprocessing": {
+        "validation_split": 0.1
+    },
+    "optimizer": {
+        "regs": 0.001,
+        "lr": 0.01
+    },
+    "loss": {
+        "metrics": "rmse"
+    },
+    "lr_scheduler": {
+        "gamma": 0.01
+    },
+    "model": {
+        "node_drop": 0.1,
+        "embed_size": 10
+    },
+    "train": {
+        "epoch": 10,
+        "early_stop": 3,
+        "logging_verbosity": 2,
+        "save_dir": "saved/"
+    }
+}

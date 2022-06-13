@@ -62,6 +62,7 @@ def main(user_name, make_graph, config_path=os.path.join(os.getcwd(), 'config.js
 
     train_dataset = data_loader.CustomDataset(train_df, device)
     test_dataset = data_loader.CustomDataset(test_df, device)
+
     train_dataloader = DataLoader(
         train_dataset, batch_size=config['data_loader']['batch_size'], shuffle=config['data_loader']['shuffle'])
     test_dataloader = DataLoader(
